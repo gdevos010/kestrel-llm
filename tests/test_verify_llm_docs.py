@@ -343,5 +343,46 @@ a.py - Two sentences. Still two sentences.
         assert exit_code == 1
 
 
+def test_verify_ignores_nested_git_repos() -> None:
+    """Python files inside nested git repos (submodules / vendored repos) should be ignored."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmpdir_path = Path(tmpdir)
+
+        main_dir = tmpdir_path / "main"
+        main_dir.mkdir()
+        (main_dir / "main.py").write_text("# Main")
+
+        # Nested repo marker as a gitdir file (common for submodules/worktrees).
+        nested_file_repo = tmpdir_path / "third_party" / "file_repo"
+        nested_file_repo.mkdir(parents=True)
+        (nested_file_repo / ".git").write_text("gitdir: /fake/path\n")
+        (nested_file_repo / "ignored_file_repo.py").write_text("# Ignored")
+
+        # Nested repo marker as an actual .git directory.
+        nested_dir_repo = tmpdir_path / "third_party" / "dir_repo"
+        (nested_dir_repo / ".git").mkdir(parents=True)
+        (nested_dir_repo / "ignored_dir_repo.py").write_text("# Ignored")
+
+        llm_file = tmpdir_path / "LLM.txt"
+        llm_file.write_text(
+            f"""### {main_dir}
+
+main.py - First sentence. Second sentence.
+
+"""
+        )
+
+        exit_code = verify(
+            repo_root=str(tmpdir_path),
+            llm_file_path=str(llm_file),
+            options=VerifyOptions(
+                enforce_two_sentences=False,
+                enforce_exact_two_sentences=True,
+                enforce_sorted=True,
+            ),
+        )
+        assert exit_code == 0
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

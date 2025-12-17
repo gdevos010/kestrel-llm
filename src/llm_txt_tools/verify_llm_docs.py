@@ -324,9 +324,23 @@ def collect_section_file_order(
 
 
 def iter_python_files(repo_root: str, excluded_dirs: set[str]) -> Iterable[str]:
-    """Yield normalized absolute paths to Python files under the repo root."""
+    """Yield normalized absolute paths to Python files under the repo root.
+
+    Notes:
+    - Prunes common excluded directories (venvs, caches, etc.)
+    - Always skips hidden directories (starting with '.')
+    - Skips any *nested* git repositories (directories that contain a `.git` marker)
+      so submodules and embedded repos are not treated as part of this repo.
+    """
     repo_root_abs = normalize_path(repo_root)
     for root, dirs, files in os.walk(repo_root_abs, topdown=True):
+        # If this directory looks like the root of a nested git repo (submodule, vendor repo,
+        # worktree checkout, etc.), skip it entirely. We allow the main repo root even if it
+        # contains a `.git` marker.
+        if root != repo_root_abs and (".git" in dirs or ".git" in files):
+            dirs[:] = []
+            continue
+
         # Prune excluded directories by name. Always skip hidden directories (starting with '.')
         dirs[:] = [
             d for d in dirs if (d not in excluded_dirs) and (not d.startswith("."))

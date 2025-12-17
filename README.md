@@ -1,6 +1,8 @@
-# Kestrel-llm
+# Kestrel-llm Tool
 
-Small, dependency-free utilities for maintaining an `LLM.txt` file in a repo.
+Small, dependency-free utilities for maintaining an `LLM.txt` file in a repo. The `LLM.txt` contains a description about each file and line number for every class and function.
+
+Checkout the [LLM.txt](LLM.txt) for this project!
 
 ## Install
 

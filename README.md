@@ -22,7 +22,7 @@ Run these from **any directory inside** a repo that contains `LLM.txt` (or `llm.
 somewhere above your current working directory.
 
 - **`llm-check`**: verify `LLM.txt` covers all `.py` files, enforces exactly two-sentence
-  summaries, and enforces per-section alphabetical sorting.
+  summaries, and enforces alphabetical sorting of both section headers and entries.
 - **`llm-fix`**: sort sections/entries in `LLM.txt` and refresh `Symbols:` blocks.
 - **`llm-sync`**: sort, strictly verify, refresh `Symbols:` blocks, then strictly verify again.
 

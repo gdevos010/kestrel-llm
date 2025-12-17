@@ -17,11 +17,11 @@ Exit code:
 - 1 if any missing files or any broken entries (and optionally if enforcing sentence count)
 
 Options:
-- Use --fix-sorting to automatically sort filenames alphabetically within each section
+- Use --fix-sorting to automatically sort section headers and filenames alphabetically
 - Use --enforce-two-sentences to make the sentence-count rule fail the check
 - Use --enforce-exact-two-sentences to require exactly two sentences (recommended)
-- Use --warn-unsorted to check if filenames are alphabetically sorted
-- Use --enforce-sorted to fail if filenames are not sorted within any section
+- Use --warn-unsorted to check if section headers and filenames are alphabetically sorted
+- Use --enforce-sorted to fail if section headers or filenames are not sorted
 
 Notes:
 - Sentence counting is heuristic: looks for occurrences of ., !, or ? followed by whitespace or end-of-line
@@ -370,6 +370,20 @@ def _merge_sections_by_dir(
     return section_order, header_line_by_dir, dict(entries_by_dir)
 
 
+def _section_sort_key(section_dir_abs: str, *, repo_root_abs: str) -> tuple[str, str]:
+    """Return a deterministic sort key for section directories.
+
+    We primarily sort by repo-relative path so the ordering is stable across machines,
+    but fall back to the absolute path when relpath cannot be computed (e.g. different
+    drives on Windows).
+    """
+    try:
+        rel = os.path.relpath(section_dir_abs, repo_root_abs)
+    except ValueError:
+        rel = section_dir_abs
+    return (rel, section_dir_abs)
+
+
 def _write_sorted_llm_file(
     llm_file_path: str,
     *,
@@ -399,16 +413,19 @@ def _write_sorted_llm_file(
 
 
 def sort_llm_file(llm_file_path: str, repo_root: str) -> None:
-    """Read LLM.txt, sort filenames alphabetically within each section, and rewrite.
+    """Read LLM.txt, sort section headers and filenames alphabetically, and rewrite.
 
     If the same section header directory appears multiple times, merge all file entries
-    into the first occurrence and drop repeated headers (preserving first-header order).
+    into the first occurrence and drop repeated headers.
     """
     repo_root_abs = normalize_path(repo_root)
 
     preamble_lines = _read_preamble_lines(llm_file_path)
     sections = parse_llm_file_detailed(llm_file_path, repo_root_abs)
     section_order, header_line_by_dir, entries_by_dir = _merge_sections_by_dir(sections)
+    section_order = sorted(
+        section_order, key=lambda d: _section_sort_key(d, repo_root_abs=repo_root_abs)
+    )
     _write_sorted_llm_file(
         llm_file_path,
         preamble_lines=preamble_lines,
@@ -593,6 +610,32 @@ def _report_unsorted_sections(
         return False
 
     any_unsorted = False
+
+    # 1) Section header order (### <dir>)
+    section_dirs_in_order = [s.header_dir_abs for s in sections]
+    sorted_section_dirs = sorted(
+        section_dirs_in_order,
+        key=lambda d: _section_sort_key(d, repo_root_abs=repo_root_abs),
+    )
+    if section_dirs_in_order != sorted_section_dirs:
+        any_unsorted = True
+        current_order = ", ".join(
+            os.path.relpath(d, repo_root_abs) for d in section_dirs_in_order
+        )
+        expected_order = ", ".join(
+            os.path.relpath(d, repo_root_abs) for d in sorted_section_dirs
+        )
+        if enforce_sorted:
+            logger.error("Unsorted section headers in LLM.txt (### <dir>)")
+            logger.error("  Current order: %s", current_order)
+            logger.error("  Sorted order:  %s", expected_order)
+        else:
+            logger.warning("Unsorted section headers in LLM.txt (### <dir>)")
+            logger.warning("  Current order: %s", current_order)
+            logger.warning("  Sorted order:  %s", expected_order)
+        logger.info("")
+
+    # 2) Filenames within each section
     for section in sections:
         files_in_order = [e.file_name for e in section.entries]
         sorted_files = sorted(files_in_order)
@@ -613,7 +656,7 @@ def _report_unsorted_sections(
         logger.info("")
 
     if not any_unsorted:
-        logger.info("All sections have filenames in alphabetical order.")
+        logger.info("All section headers and filenames are in alphabetical order.")
 
     return any_unsorted and enforce_sorted
 
@@ -635,9 +678,11 @@ def verify(
 
     # Apply sorting fix if requested
     if options.fix_sorting:
-        logger.info("Sorting filenames alphabetically within each section...")
+        logger.info("Sorting section headers and filenames alphabetically...")
         sort_llm_file(llm_file_abs, repo_root_abs)
-        logger.info("LLM.txt has been updated with sorted filenames.")
+        logger.info(
+            "LLM.txt has been updated with sorted section headers and filenames."
+        )
         logger.info("")
 
     sections = parse_llm_file_detailed(llm_file_abs, repo_root_abs)

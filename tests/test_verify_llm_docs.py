@@ -70,6 +70,37 @@ alpha.py - Alpha description.
         assert section_order[dir2_abs] == ["alpha.py", "delta.py"]
 
 
+def test_sort_llm_file_sorts_section_headers() -> None:
+    """Test that sort_llm_file sorts `### <dir>` sections alphabetically by path."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        llm_file = Path(tmpdir) / "LLM.txt"
+
+        dir_a = Path(tmpdir) / "a"
+        dir_b = Path(tmpdir) / "b"
+
+        # Write content with section headers out of order.
+        llm_file.write_text(
+            f"""### {dir_b}
+
+b.py - Two sentences. Still two sentences.
+
+### {dir_a}
+
+a.py - Two sentences. Still two sentences.
+
+"""
+        )
+
+        sort_llm_file(str(llm_file), tmpdir)
+
+        section_order = collect_section_file_order(str(llm_file), tmpdir)
+        keys = list(section_order.keys())
+
+        dir_a_abs = os.path.normpath(os.path.abspath(str(dir_a)))
+        dir_b_abs = os.path.normpath(os.path.abspath(str(dir_b)))
+        assert keys == [dir_a_abs, dir_b_abs]
+
+
 def test_sort_llm_file_preserves_multiline_descriptions() -> None:
     """Test that multi-line descriptions are preserved during sorting."""
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -273,6 +304,43 @@ Symbols:
             ),
         )
         assert exit_code == 0
+
+
+def test_verify_enforce_sorted_fails_on_unsorted_section_headers() -> None:
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmpdir_path = Path(tmpdir)
+
+        dir_a = tmpdir_path / "a"
+        dir_b = tmpdir_path / "b"
+        dir_a.mkdir()
+        dir_b.mkdir()
+
+        (dir_a / "a.py").write_text("# A")
+        (dir_b / "b.py").write_text("# B")
+
+        llm_file = tmpdir_path / "LLM.txt"
+        llm_file.write_text(
+            f"""### {dir_b}
+
+b.py - Two sentences. Still two sentences.
+
+### {dir_a}
+
+a.py - Two sentences. Still two sentences.
+
+"""
+        )
+
+        exit_code = verify(
+            repo_root=str(tmpdir_path),
+            llm_file_path=str(llm_file),
+            options=VerifyOptions(
+                enforce_two_sentences=False,
+                enforce_exact_two_sentences=True,
+                enforce_sorted=True,
+            ),
+        )
+        assert exit_code == 1
 
 
 if __name__ == "__main__":

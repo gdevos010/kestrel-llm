@@ -36,12 +36,12 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from itertools import islice
 
-from llm_txt_tools.logging_utils import setup_logging
-from llm_txt_tools.repo_utils import normalize_path
-from llm_txt_tools.verify_llm_docs import (
+from kestrel_llm.logging_utils import setup_logging
+from kestrel_llm.repo_utils import normalize_path
+from kestrel_llm.verify_llm_docs import (
     FILE_LINE_PATTERN as _FILE_LINE_PATTERN,
 )
-from llm_txt_tools.verify_llm_docs import (
+from kestrel_llm.verify_llm_docs import (
     HEADER_PATTERN as _HEADER_PATTERN,
 )
 

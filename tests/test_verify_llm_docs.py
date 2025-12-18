@@ -15,7 +15,7 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
-from llm_txt_tools.verify_llm_docs import (  # noqa: E402
+from kestrel_llm.verify_llm_docs import (  # noqa: E402
     collect_section_file_order,
     sort_llm_file,
     VerifyOptions,

@@ -39,9 +39,9 @@ from collections import defaultdict
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 
-from llm_txt_tools.logging_utils import setup_logging
-from llm_txt_tools.repo_utils import normalize_path
-
+from kestrel_llm.logging_utils import setup_logging
+from kestrel_llm.repo_utils import normalize_path
+    
 DEFAULT_EXCLUDED_DIRS: set[str] = {
     ".git",
     "__pycache__",

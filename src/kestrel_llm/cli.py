@@ -8,10 +8,10 @@ import sys
 
 from collections.abc import Sequence
 
-from llm_txt_tools.logging_utils import setup_logging
-from llm_txt_tools.repo_utils import resolve_repo_root_and_llm_file
-from llm_txt_tools.update_llm_symbols import update_llm_file
-from llm_txt_tools.verify_llm_docs import VerifyOptions, verify
+from kestrel_llm.logging_utils import setup_logging
+from kestrel_llm.repo_utils import resolve_repo_root_and_llm_file
+from kestrel_llm.update_llm_symbols import update_llm_file
+from kestrel_llm.verify_llm_docs import VerifyOptions, verify
 
 
 def _build_common_parser(*, prog: str, description: str) -> argparse.ArgumentParser:
@@ -62,7 +62,7 @@ def llm_check_main(argv: Sequence[str] | None = None) -> int:
             extra_excluded_dirs=tuple(args.exclude_dir),
             warn_unsorted=False,
             enforce_sorted=True,
-            fix_sorting=False,
+            fix_sorting=True,
         ),
     )
 
@@ -146,7 +146,7 @@ def llm_sync_main(argv: Sequence[str] | None = None) -> int:
             extra_excluded_dirs=tuple(args.exclude_dir),
             warn_unsorted=False,
             enforce_sorted=True,
-            fix_sorting=False,
+            fix_sorting=True,
         ),
     )
     if exit_code != 0:
@@ -171,7 +171,7 @@ def llm_sync_main(argv: Sequence[str] | None = None) -> int:
             extra_excluded_dirs=tuple(args.exclude_dir),
             warn_unsorted=False,
             enforce_sorted=True,
-            fix_sorting=False,
+            fix_sorting=True,
         ),
     )
 

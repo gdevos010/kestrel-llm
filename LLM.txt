@@ -1,4 +1,4 @@
-### src/llm_txt_tools/
+### src/kestrel_llm/
 
 __init__.py - Declares the package and exposes its version. Keeps the top-level import surface small and stable.
 
@@ -21,7 +21,7 @@ Symbols:
 
 verify_llm_docs.py - Scans a repo for .py files and checks they are documented in LLM.txt sections. Detects missing entries, broken references, repeated headers, duplicates, and sentence/sorting issues.
 Symbols:
-  - Functions: _build_excluded_dirs (L438), _find_duplicate_entries (L460), _find_repeated_headers (L444), _find_sentence_issues (L466), _group_entries_by_path (L453), _log_overview (L483), _merge_sections_by_dir (L356), _read_preamble_lines (L345), _report_documented_missing_on_disk (L556), _report_duplicate_entries (L519), _report_missing_in_llm (L539), _report_repeated_headers (L499), _report_sentence_issues (L573), _report_unsorted_sections (L601), _resolve_header_dir_abs (L131), _section_sort_key (L373), _write_sorted_llm_file (L387), build_arg_parser (L760), collect_section_file_order (L289), count_sentences (L340), iter_python_files (L326), main (L811), parse_llm_file (L227), parse_llm_file_detailed (L138), sort_llm_file (L415), verify (L664)
+  - Functions: _build_excluded_dirs (L452), _find_duplicate_entries (L474), _find_repeated_headers (L458), _find_sentence_issues (L480), _group_entries_by_path (L467), _log_overview (L497), _merge_sections_by_dir (L370), _read_preamble_lines (L359), _report_documented_missing_on_disk (L570), _report_duplicate_entries (L533), _report_missing_in_llm (L553), _report_repeated_headers (L513), _report_sentence_issues (L587), _report_unsorted_sections (L615), _resolve_header_dir_abs (L131), _section_sort_key (L387), _write_sorted_llm_file (L401), build_arg_parser (L774), collect_section_file_order (L289), count_sentences (L354), iter_python_files (L326), main (L825), parse_llm_file (L227), parse_llm_file_detailed (L138), sort_llm_file (L429), verify (L678)
   - Classes: DocumentedFile (L112), LLMEntry (L88), LLMSection (L77), VerifyOptions (L120)
   - Methods: LLMEntry.summary_lines (L97), LLMEntry.summary_text (L106)
 
@@ -29,5 +29,5 @@ Symbols:
 
 test_verify_llm_docs.py - Tests sorting and verification behavior using temporary repos and LLM.txt fixtures. Covers repeated headers, duplicate entries, and strict sentence enforcement.
 Symbols:
-  - Functions: test_sort_llm_file_already_sorted (L138), test_sort_llm_file_basic (L26), test_sort_llm_file_preserves_multiline_descriptions (L104), test_sort_llm_file_sorts_section_headers (L73), test_verify_detects_duplicate_file_entries (L251), test_verify_detects_repeated_headers_and_fix_sorting_merges (L203), test_verify_enforce_exact_two_sentences_ignores_symbols_block (L278), test_verify_enforce_sorted_fails_on_unsorted_section_headers (L309), test_verify_with_fix_sorting_integration (L165)
+  - Functions: test_sort_llm_file_already_sorted (L138), test_sort_llm_file_basic (L26), test_sort_llm_file_preserves_multiline_descriptions (L104), test_sort_llm_file_sorts_section_headers (L73), test_verify_detects_duplicate_file_entries (L251), test_verify_detects_repeated_headers_and_fix_sorting_merges (L203), test_verify_enforce_exact_two_sentences_ignores_symbols_block (L278), test_verify_enforce_sorted_fails_on_unsorted_section_headers (L309), test_verify_ignores_nested_git_repos (L346), test_verify_with_fix_sorting_integration (L165)
 

@@ -384,5 +384,94 @@ main.py - First sentence. Second sentence.
         assert exit_code == 0
 
 
+def test_verify_ignores_nested_llm_roots_but_requires_llm_reference() -> None:
+    """If a subdirectory contains its own LLM.txt, we should:
+    - Ignore files inside that subtree for the parent scan
+    - Require the nested LLM.txt file itself to be documented in the parent LLM.txt
+    """
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmpdir_path = Path(tmpdir)
+
+        (tmpdir_path / "main.py").write_text("# Main")
+
+        nested = tmpdir_path / "tabm"
+        nested.mkdir(parents=True)
+        (nested / "LLM.txt").write_text("### ./\n\nsub.py - First sentence. Second sentence.\n")
+        (nested / "ignored.py").write_text("# Ignored")
+
+        llm_file = tmpdir_path / "LLM.txt"
+
+        # Missing the nested LLM.txt reference should fail.
+        llm_file.write_text(
+            f"""### {tmpdir_path}
+
+main.py - First sentence. Second sentence.
+
+"""
+        )
+        exit_code_missing = verify(
+            repo_root=str(tmpdir_path),
+            llm_file_path=str(llm_file),
+            options=VerifyOptions(
+                enforce_two_sentences=False,
+                enforce_exact_two_sentences=True,
+                enforce_sorted=True,
+            ),
+        )
+        assert exit_code_missing == 1
+
+        # Adding an explicit entry for the nested LLM.txt should pass, without requiring
+        # documentation for files inside the nested subtree.
+        llm_file.write_text(
+            f"""### {tmpdir_path}
+
+main.py - First sentence. Second sentence.
+
+### {nested}
+
+LLM.txt - First sentence. Second sentence.
+
+"""
+        )
+        exit_code = verify(
+            repo_root=str(tmpdir_path),
+            llm_file_path=str(llm_file),
+            options=VerifyOptions(
+                enforce_two_sentences=False,
+                enforce_exact_two_sentences=True,
+                enforce_sorted=True,
+            ),
+        )
+        assert exit_code == 0
+
+
+def test_verify_detects_missing_markdown_files() -> None:
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmpdir_path = Path(tmpdir)
+
+        (tmpdir_path / "main.py").write_text("# Main")
+        (tmpdir_path / "README.md").write_text("# Repo docs")
+
+        llm_file = tmpdir_path / "LLM.txt"
+        llm_file.write_text(
+            f"""### {tmpdir_path}
+
+main.py - First sentence. Second sentence.
+
+"""
+        )
+
+        exit_code = verify(
+            repo_root=str(tmpdir_path),
+            llm_file_path=str(llm_file),
+            options=VerifyOptions(
+                enforce_two_sentences=False,
+                enforce_exact_two_sentences=True,
+                enforce_sorted=True,
+            ),
+        )
+        assert exit_code == 1
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

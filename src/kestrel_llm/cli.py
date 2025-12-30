@@ -44,7 +44,7 @@ def llm_check_main(argv: Sequence[str] | None = None) -> int:
     """Entry-point for the `llm-check` console script."""
     parser = _build_common_parser(
         prog="llm-check",
-        description="Verify LLM.txt covers all Python files (strict: 2-sentence summaries + sorted sections).",
+        description="Verify LLM.txt covers all Python and Markdown files (strict: 2-sentence summaries + sorted sections).",
     )
     args = parser.parse_args(argv)
     setup_logging(args.log_level)

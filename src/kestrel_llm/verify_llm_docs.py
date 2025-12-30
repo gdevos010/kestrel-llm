@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
-"""Verify that every Python file in the repository is documented in LLM.txt.
+"""Verify that every Python and Markdown file in the repository is documented in LLM.txt.
 
 Behavior:
-- Scans the repository for .py files (excluding common virtualenv/cache/build dirs)
+- Scans the repository for .py and .md files (excluding common virtualenv/cache/build dirs)
+- Treats any subdirectory containing its own `LLM.txt` / `llm.txt` as a separate doc root:
+  - Skips scanning files inside that subtree
+  - Requires the nested LLM file itself to be documented in the parent LLM.txt
 - Parses LLM.txt sections of the form:
   "### /abs/path/to/dir/" followed by lines "filename.py - Description..."
 - Reports:
-  1) Python files missing from LLM.txt
+  1) Files missing from LLM.txt
   2) Entries documented in LLM.txt where the file does not exist
   3) Entries whose summary appears to contain too few sentences (optional enforcement)
   4) Repeated section headers (same directory appears multiple times)
@@ -40,8 +43,8 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 
 from kestrel_llm.logging_utils import setup_logging
-from kestrel_llm.repo_utils import normalize_path
-    
+from kestrel_llm.repo_utils import DEFAULT_LLM_FILENAMES, normalize_path
+
 DEFAULT_EXCLUDED_DIRS: set[str] = {
     ".git",
     "__pycache__",
@@ -63,7 +66,7 @@ DEFAULT_EXCLUDED_DIRS: set[str] = {
 
 HEADER_PATTERN = re.compile(r"^\s*###\s+(?P<dir>\S+)\s*$")
 FILE_LINE_PATTERN = re.compile(
-    r"^\s*(?P<name>[A-Za-z0-9_]+\.py)\s*-\s*(?P<desc>.+?)\s*$"
+    r"^\s*(?P<name>(?:LLM\.txt|llm\.txt|[A-Za-z0-9_.-]+\.(?:py|md)))\s*-\s*(?P<desc>.+?)\s*$"
 )
 SENTENCE_BOUNDARY_PATTERN = re.compile(r"[.!?](?:\s|$)")
 
@@ -86,7 +89,7 @@ class LLMSection:
 
 @dataclass
 class LLMEntry:
-    """A single `filename.py - ...` entry within an LLM.txt section."""
+    """A single documented file entry within an LLM.txt section."""
 
     section_dir_abs: str
     file_name: str
@@ -323,15 +326,9 @@ def collect_section_file_order(
     return section_to_files
 
 
-def iter_python_files(repo_root: str, excluded_dirs: set[str]) -> Iterable[str]:
-    """Yield normalized absolute paths to Python files under the repo root.
-
-    Notes:
-    - Prunes common excluded directories (venvs, caches, etc.)
-    - Always skips hidden directories (starting with '.')
-    - Skips any *nested* git repositories (directories that contain a `.git` marker)
-      so submodules and embedded repos are not treated as part of this repo.
-    """
+def _iter_files_with_suffixes(
+    repo_root: str, excluded_dirs: set[str], *, suffixes: tuple[str, ...]
+) -> Iterable[str]:
     repo_root_abs = normalize_path(repo_root)
     for root, dirs, files in os.walk(repo_root_abs, topdown=True):
         # If this directory looks like the root of a nested git repo (submodule, vendor repo,
@@ -345,10 +342,61 @@ def iter_python_files(repo_root: str, excluded_dirs: set[str]) -> Iterable[str]:
         dirs[:] = [
             d for d in dirs if (d not in excluded_dirs) and (not d.startswith("."))
         ]
+
+        # If this directory has its own LLM file, treat it as a separate documentation root.
+        # We skip scanning any files in this subtree from the parent repo scan.
+        if root != repo_root_abs and any(
+            name in files for name in DEFAULT_LLM_FILENAMES
+        ):
+            dirs[:] = []
+            continue
+
         for fname in files:
-            if not fname.endswith(".py"):
+            if not fname.endswith(suffixes):
                 continue
             yield normalize_path(os.path.join(root, fname))
+
+
+def iter_python_files(repo_root: str, excluded_dirs: set[str]) -> Iterable[str]:
+    """Yield normalized absolute paths to Python files under the repo root.
+
+    Notes:
+    - Prunes common excluded directories (venvs, caches, etc.)
+    - Always skips hidden directories (starting with '.')
+    - Skips any *nested* git repositories (directories that contain a `.git` marker)
+      so submodules and embedded repos are not treated as part of this repo.
+    """
+    yield from _iter_files_with_suffixes(repo_root, excluded_dirs, suffixes=(".py",))
+
+
+def iter_required_files(repo_root: str, excluded_dirs: set[str]) -> Iterable[str]:
+    """Yield normalized absolute paths to files that must be documented in LLM.txt."""
+    repo_root_abs = normalize_path(repo_root)
+    for root, dirs, files in os.walk(repo_root_abs, topdown=True):
+        # Skip nested git repositories.
+        if root != repo_root_abs and (".git" in dirs or ".git" in files):
+            dirs[:] = []
+            continue
+
+        # Prune excluded directories by name. Always skip hidden directories (starting with '.')
+        dirs[:] = [
+            d for d in dirs if (d not in excluded_dirs) and (not d.startswith("."))
+        ]
+
+        # If this directory has its own LLM file, require the nested LLM file to be documented
+        # in the parent LLM.txt, but skip scanning any files inside this subtree.
+        if root != repo_root_abs:
+            nested_llm_name = next(
+                (name for name in DEFAULT_LLM_FILENAMES if name in files), None
+            )
+            if nested_llm_name is not None:
+                yield normalize_path(os.path.join(root, nested_llm_name))
+                dirs[:] = []
+                continue
+
+        for fname in files:
+            if fname.endswith((".py", ".md")):
+                yield normalize_path(os.path.join(root, fname))
 
 
 def count_sentences(text: str) -> int:
@@ -499,13 +547,13 @@ def _log_overview(
     *,
     repo_root_abs: str,
     llm_file_abs: str,
-    python_files_found: int,
+    required_files_found: int,
     documented_files_found: int,
 ) -> None:
     logger.info("Repo root: %s", repo_root_abs)
     logger.info("LLM file:  %s", llm_file_abs)
     logger.info("")
-    logger.info("Python files found: %d", python_files_found)
+    logger.info("Required files found: %d", required_files_found)
     logger.info("Documented in LLM:  %d", documented_files_found)
     logger.info("")
 
@@ -714,11 +762,11 @@ def verify(
     entries_by_path = _group_entries_by_path(entries)
     duplicate_entries = _find_duplicate_entries(entries_by_path)
 
-    all_py_files = set(iter_python_files(repo_root_abs, excluded))
+    all_required_files = set(iter_required_files(repo_root_abs, excluded))
 
     documented_paths = set(entries_by_path.keys())
 
-    missing_in_llm = sorted(all_py_files - documented_paths)
+    missing_in_llm = sorted(all_required_files - documented_paths)
     documented_missing_on_disk = sorted(
         p for p in documented_paths if not os.path.exists(p)
     )
@@ -732,7 +780,7 @@ def verify(
         logger,
         repo_root_abs=repo_root_abs,
         llm_file_abs=llm_file_abs,
-        python_files_found=len(all_py_files),
+        required_files_found=len(all_required_files),
         documented_files_found=len(documented_paths),
     )
 
@@ -774,7 +822,7 @@ def verify(
 def build_arg_parser() -> argparse.ArgumentParser:
     """Build the CLI argument parser for the standalone script entry point."""
     parser = argparse.ArgumentParser(
-        description="Verify every Python file is documented in LLM.txt"
+        description="Verify every Python and Markdown file is documented in LLM.txt"
     )
     parser.add_argument(
         "--repo-root",

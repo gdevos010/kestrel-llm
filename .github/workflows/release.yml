@@ -1,0 +1,105 @@
+name: Create GitHub Release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - pyproject.toml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: create-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch tags
+        run: git fetch --tags --force
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Determine whether to release
+        id: version
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          python - <<'PY'
+          import io
+          import os
+          import subprocess
+          import tomllib
+          
+          
+          def _version_from_toml_bytes(data: bytes) -> str:
+              doc = tomllib.load(io.BytesIO(data))
+              version = doc.get("project", {}).get("version")
+              if not version or not isinstance(version, str):
+                  raise RuntimeError("pyproject.toml is missing [project].version")
+              return version
+          
+          
+          def _tag_exists(tag: str) -> bool:
+              try:
+                  subprocess.check_call(
+                      ["git", "show-ref", "--tags", "--verify", "--quiet", f"refs/tags/{tag}"]
+                  )
+              except subprocess.CalledProcessError:
+                  return False
+              return True
+          
+          
+          new_version = _version_from_toml_bytes(open("pyproject.toml", "rb").read())
+          
+          before_sha = os.environ.get("BEFORE_SHA", "")
+          old_version = ""
+          if before_sha and before_sha != "0000000000000000000000000000000000000000":
+              try:
+                  old_bytes = subprocess.check_output(
+                      ["git", "show", f"{before_sha}:pyproject.toml"], stderr=subprocess.DEVNULL
+                  )
+              except subprocess.CalledProcessError:
+                  old_version = ""
+              else:
+                  try:
+                      old_version = _version_from_toml_bytes(old_bytes)
+                  except Exception:
+                      old_version = ""
+          
+          tag = new_version
+          should_release = "true" if (new_version != old_version and not _tag_exists(tag)) else "false"
+          
+          print(f"old_version={old_version}")
+          print(f"new_version={new_version}")
+          print(f"tag={tag}")
+          print(f"should_release={should_release}")
+          
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as f:
+              f.write(f"old_version={old_version}\n")
+              f.write(f"new_version={new_version}\n")
+              f.write(f"tag={tag}\n")
+              f.write(f"should_release={should_release}\n")
+          PY
+
+      - name: Create release
+        if: steps.version.outputs.should_release == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.tag }}
+          generate_release_notes: true
+          target_commitish: ${{ github.sha }}
+
+

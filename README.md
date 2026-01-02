@@ -34,3 +34,7 @@ somewhere above your current working directory.
 - **`--llm-file PATH`**: override the `LLM.txt` path.
 - **`--exclude-dir NAME`**: exclude additional directory names when scanning (repeatable).
 - **`--log-level LEVEL`**: set logging level (or use `LOG_LEVEL` env var).
+
+## Releasing
+
+Bump `[project].version` in `pyproject.toml` and push to `main`. GitHub Actions will create a tag + GitHub Release for that version (for example `0.1.5`), which triggers the existing “Publish to PyPI” workflow.
